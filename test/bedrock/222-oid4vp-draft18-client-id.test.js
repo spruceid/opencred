@@ -9,7 +9,8 @@ import {config} from '@bedrock/core';
 import {domainToDidWeb} from '../../lib/didWeb.js';
 import expect from 'expect.js';
 import {
-  generateAuthorizationRequest
+  generateAuthorizationRequest,
+  handleAuthorizationResponse
 } from '../../lib/workflows/profiles/native-oid4vp-standard.js';
 
 // Test workflow with mixed formats (jwt_vc_json and mso_mdoc)
@@ -71,6 +72,35 @@ describe('OID4VP-draft18 Client ID Format', function() {
           domainToDidWeb(config.server.baseUri)
         );
         expect(result.signingMetadata).to.be(undefined);
+    });
+  });
+
+  describe('handleAuthorizationResponse', function() {
+    it('records an access_denied response without requiring a vp_token',
+      async function() {
+        const exchange = {
+          id: 'test-exchange',
+          sequence: 0,
+          state: 'active',
+          step: 'default',
+          variables: {
+            authorizationRequest: {state: 'expected-state'}
+          }
+        };
+
+        const {updatedExchange} = await handleAuthorizationResponse({
+          workflow: testWorkflow,
+          exchange,
+          responseBody: {
+            error: 'access_denied',
+            state: 'expected-state'
+          }
+        });
+
+        expect(updatedExchange.state).to.equal('invalid');
+        expect(updatedExchange.variables.results.default.errors).to.eql([
+          'access_denied'
+        ]);
       });
   });
 });
